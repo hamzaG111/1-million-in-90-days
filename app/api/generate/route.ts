@@ -1,66 +1,93 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const contentTypePrompts: Record<string, string> = {
-  instagram: "كابشن انستقرام جذاب مع ايموجي مناسبة وهاشتاقات",
-  tiktok: "سكريبت فيديو تيك توك قصير وجذاب (30-60 ثانية) مع hook قوي في البداية",
-  youtube: "سكريبت فيديو يوتيوب متكامل مع مقدمة وعرض وخاتمة وكول تو أكشن",
-  tweet: "تغريدة قوية ومختصرة مع هاشتاقات مناسبة",
-  reels: "فكرة ريلز إبداعية مع سكريبت قصير وكابشن",
+const CONTENT_DESCS: Record<string, string> = {
+  instagram: "كابشن انستقرام جذاب مع ايموجي مناسبة وهاشتاقات في السطر الأخير",
+  tiktok: "سكريبت تيك توك (30-60 ثانية) يبدأ بـ hook صادم ويختم بـ CTA قوي",
+  youtube: "سكريبت يوتيوب متكامل: مقدمة hook، محتوى، خاتمة مع اشترك",
+  tweet: "تغريدة مؤثرة ومختصرة بأقل من 280 حرف مع هاشتاقات",
+  reels: "فكرة ريلز إبداعية مع سكريبت مختصر وكابشن وهاشتاقات",
 };
 
-const dialectPrompts: Record<string, string> = {
-  gulf: "باللهجة الخليجية السعودية/الإماراتية الطبيعية والعصرية",
+const DIALECT_DESCS: Record<string, string> = {
+  gulf: "باللهجة الخليجية السعودية العصرية الطبيعية (مو فصحى)",
   egyptian: "باللهجة المصرية العامية الطبيعية",
-  levantine: "باللهجة الشامية السورية/اللبنانية",
+  levantine: "باللهجة الشامية اللبنانية/السورية الطبيعية",
   msa: "بالعربية الفصحى المبسطة والحديثة",
+};
+
+const TONE_LABELS: Record<string, string> = {
+  natural: "طبيعي وعفوي",
+  funny: "مرح وخفيف الظل مع فكاهة ذكية",
+  professional: "احترافي وموثوق",
+  emotional: "عاطفي ومؤثر يلمس القلب",
 };
 
 export async function POST(req: NextRequest) {
   try {
     const { topic, contentType, dialect, tone } = await req.json();
 
-    if (!topic || !contentType || !dialect) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!topic?.trim()) {
+      return NextResponse.json({ error: "الموضوع مطلوب" }, { status: 400 });
     }
 
-    const contentPrompt = contentTypePrompts[contentType] || contentTypePrompts.instagram;
-    const dialectPrompt = dialectPrompts[dialect] || dialectPrompts.gulf;
+    const contentDesc = CONTENT_DESCS[contentType] ?? CONTENT_DESCS.instagram;
+    const dialectDesc = DIALECT_DESCS[dialect] ?? DIALECT_DESCS.gulf;
+    const toneLabel = TONE_LABELS[tone] ?? TONE_LABELS.natural;
 
-    const systemPrompt = `أنت خبير في إنشاء المحتوى الرقمي للسوشيال ميديا العربية.
-تفهم جيداً ما يتفاعل معه الجمهور العربي وتكتب بأسلوب ${tone === "funny" ? "مرح وخفيف الظل" : tone === "professional" ? "احترافي وموثوق" : tone === "emotional" ? "عاطفي ومؤثر" : "طبيعي وعفوي"}.
-المحتوى الذي تكتبه ${dialectPrompt}.
-تركز دائماً على الجودة والتفاعل والأصالة.`;
+    const systemPrompt = `أنت خبير محتوى رقمي عربي محترف. تكتب محتوى يُشعل التفاعل ويُجنن الجمهور.
+أسلوبك: ${toneLabel}.
+اللهجة: ${dialectDesc}.
+قاعدة: أعد JSON فقط — بدون أي نص قبله أو بعده، بدون \`\`\`json.`;
 
-    const userPrompt = `اكتب ${contentPrompt} عن الموضوع التالي:
-"${topic}"
+    const userPrompt = `أنشئ 3 نسخ مختلفة تماماً من ${contentDesc} عن: "${topic.trim()}"
 
-المطلوب:
-1. المحتوى الرئيسي
-2. الهاشتاقات المناسبة (إذا كانت مناسبة للمنصة)
-3. نصيحة سريعة لزيادة التفاعل مع هذا المحتوى
+أعد JSON بالشكل التالي بالضبط:
+{
+  "variants": [
+    {
+      "content": "النص الكامل هنا",
+      "viralScore": 91,
+      "style": "عاطفي وشخصي",
+      "tip": "نصيحة واحدة قصيرة لزيادة التفاعل مع هذه النسخة"
+    },
+    {
+      "content": "...",
+      "viralScore": 84,
+      "style": "مباشر وصادم",
+      "tip": "..."
+    },
+    {
+      "content": "...",
+      "viralScore": 77,
+      "style": "إبداعي وغير متوقع",
+      "tip": "..."
+    }
+  ]
+}
 
-اكتب مباشرة بدون مقدمات أو شرح.`;
+القواعد:
+- النسخ الثلاث مختلفة تماماً في البناء والأسلوب
+- viralScore بين 65–97 بناءً على قوة الهوك والعاطفة والمشاركة المتوقعة
+- كل نسخة تبدأ بجملة hook مختلفة
+- الهاشتاقات فقط في نهاية المحتوى (للانستقرام والريلز والتيك توك)`;
 
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: userPrompt }],
+      max_tokens: 2048,
       system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
     });
 
-    const content = message.content[0];
-    if (content.type !== "text") {
-      throw new Error("Unexpected response type");
-    }
+    const raw = message.content[0].type === "text" ? message.content[0].text : "";
+    const clean = raw.replace(/```json\s?|\s?```/g, "").trim();
+    const data = JSON.parse(clean);
 
-    return NextResponse.json({ result: content.text });
-  } catch (error) {
-    console.error("Generation error:", error);
-    return NextResponse.json({ error: "Failed to generate content" }, { status: 500 });
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error("Generate error:", err);
+    return NextResponse.json({ error: "فشل الإنشاء. حاول مجدداً." }, { status: 500 });
   }
 }
